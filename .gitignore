@@ -2,3 +2,4 @@
 *.png
 oxiddstuff/
 .DS_Store
+*.dot
