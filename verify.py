@@ -77,45 +77,28 @@ class Proposition:
         self.raw_string = raw_string
         self.op = Operand.from_string(op) if op else None
         self.inputs = inputs if inputs is not None else []
-        self._oxiddvariable = None  # Initialize the property with a default value
-        self._resolved = False  # Initialize the resolved property
-        self._cached = None  # Initialize the cached property
+        self.oxiddvariable = None  # Initialize the property with a default value
+        self.resolved = False  # Initialize the resolved property
+        self.cached = None  # Initialize the cached property
 
-    @property
-    def oxiddvariable(self):
-        return self._oxiddvariable
+def resolve_to_oxidd(propositions, name):
+    prop = propositions[name]
 
-    @oxiddvariable.setter
-    def oxiddvariable(self, value):
-        self._oxiddvariable = value
+    if prop.resolved:
+        return prop.cached
 
-    @property
-    def resolved(self):
-        return self._resolved
+    if not prop.inputs and prop.op:
+        raise Exception(f"inputs is none but operand is: {prop.op}")
+    if prop.inputs and not prop.op:
+        raise Exception(f"prop has no operand but inputs are: {prop.inputs}")
+    if not prop.inputs and not prop.op:
+        return prop.oxiddvariable
 
-    @resolved.setter
-    def resolved(self, value):
-        self._resolved = value
+    resolved_input_variables = [resolve_to_oxidd(propositions, i) for i in prop.inputs]
 
-    def resolve_to_oxidd(self, propositions, name):
-        assert propositions[name].oxiddvariable == self._oxiddvariable
-        prop = propositions[name]
-
-        if self.resolved:
-            return self._cached
-
-        if not prop.inputs and prop.op:
-            raise Exception(f"inputs is none but operand is: {prop.op}")
-        if prop.inputs and not prop.op:
-            raise Exception(f"prop has no operand but inputs are: {prop.inputs}")
-        if not prop.inputs and not prop.op:
-            return prop._oxiddvariable
-
-        resolved_input_variables = [propositions[i].resolve_to_oxidd(propositions, i) for i in prop.inputs]
-
-        self._cached = prop.op.apply(resolved_input_variables)
-        self.resolved = True
-        return self._cached
+    prop.cached = prop.op.apply(resolved_input_variables)
+    prop.resolved = True
+    return prop.cached
 
 def parse_bench_file(file_path):
     input_names = []
@@ -170,8 +153,7 @@ for name, prop in propositions.items():
     names.append((var, name))
 
 for atom in output_atoms:
-    prop = propositions[atom.name]
-    atom.oxiddvariable = prop.resolve_to_oxidd(propositions, atom.name)
+    atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name)
 
 print("Input Names:", input_names)
 print("Output Atoms:")
