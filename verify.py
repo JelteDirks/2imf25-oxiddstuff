@@ -1,7 +1,12 @@
+import sys
 import os
 import re
+import pygraphviz as pgv
 from oxidd.bdd import BDDManager
 from classes import Operand, OutputAtom, Proposition
+
+def eprint(msg):
+    print(msg, file=sys.stderr)
 
 def print_propositions(props):
     print("Merged Propositions:")
@@ -66,76 +71,105 @@ def parse_bench_file(file_path, propositions):
 
     return input_atoms, output_atoms
 
+def write_to_files(manager, normal_circuit_dotfile_dest_path, names, pgv, normal_circuit_png_dest_path, output_atoms, output_list_path, opt_output_atoms, opt_output_list_path):
+    manager.dump_all_dot_file(normal_circuit_dotfile_dest_path, functions=names, variables=names)
+    original_graph = pgv.AGraph(normal_circuit_dotfile_dest_path)
+    original_graph.draw(normal_circuit_png_dest_path, prog="dot")
+    write_output_atoms_to_file(output_atoms, output_list_path)
+    write_output_atoms_to_file(opt_output_atoms, opt_output_list_path)
+
 def write_output_atoms_to_file(output_atoms, file_path):
     with open(file_path, 'w') as file:
         for atom in output_atoms:
             file.write(f"{atom.name}\n")
 
-# Example usage
 bench_dir = 'circuit-bench'
-circuit_number = 2
-circuit_name = f'circuit{circuit_number:02}'
-normal_circuit_source_path = f'{bench_dir}/{circuit_name}.bench'
-opt_circuit_source_path = f'{bench_dir}/{circuit_name}_opt.bench'
+circuit_number = 5
 
-dest_dir = f'{circuit_name}_out'
-os.makedirs(dest_dir, exist_ok=True)
+def check_circuit(circuit_number):
+    circuit_name = f'circuit{circuit_number:02}'
+    normal_circuit_source_path = f'{bench_dir}/{circuit_name}.bench'
+    opt_circuit_source_path = f'{bench_dir}/{circuit_name}_opt.bench'
 
-normal_circuit_dotfile_dest_path = f'{dest_dir}/{circuit_name}.dot'
-opt_circuit_dotfile_dest_path = f'{dest_dir}/{circuit_name}_opt.dot'
-output_list_path = f'{dest_dir}/{circuit_name}_outputs.txt'
+    dest_dir = f'{circuit_name}_out'
+    os.makedirs(dest_dir, exist_ok=True)
+
+    normal_circuit_dotfile_dest_path = f'{dest_dir}/{circuit_name}.dot'
+    opt_circuit_dotfile_dest_path = f'{dest_dir}/{circuit_name}_opt.dot'
+    output_list_path = f'{dest_dir}/{circuit_name}_outputs.txt'
+    opt_output_list_path = f'{dest_dir}/{circuit_name}_opt_outputs.txt'
+
+    normal_circuit_png_dest_path = f'{dest_dir}/{circuit_name}.png'
 
 # Check if both bench files exist
-if not os.path.exists(normal_circuit_source_path):
-    print(f"Error: {normal_circuit_source_path} does not exist.")
-if not os.path.exists(opt_circuit_source_path):
-    print(f"Error: {opt_circuit_source_path} does not exist.")
+    if not os.path.exists(normal_circuit_source_path):
+        print(f"Error: {normal_circuit_source_path} does not exist.")
+    if not os.path.exists(opt_circuit_source_path):
+        print(f"Error: {opt_circuit_source_path} does not exist.")
 
-propositions = {}
+    propositions = {}
 
-input_atoms, output_atoms = parse_bench_file(normal_circuit_source_path, propositions)
-opt_input_atoms, opt_output_atoms = parse_bench_file(opt_circuit_source_path, propositions)
+    eprint("parsing bench files")
+
+    input_atoms, output_atoms = parse_bench_file(normal_circuit_source_path, propositions)
+    opt_input_atoms, opt_output_atoms = parse_bench_file(opt_circuit_source_path, propositions)
 
 # Sanity check for input atoms
-missing_in_normal = set(opt_input_atoms) - set(input_atoms)
-missing_in_opt = set(input_atoms) - set(opt_input_atoms)
+    missing_in_normal = set(opt_input_atoms) - set(input_atoms)
+    missing_in_opt = set(input_atoms) - set(opt_input_atoms)
 
-if missing_in_normal:
-    print(f"Inputs in opt file but not in normal file: {missing_in_normal}")
-if missing_in_opt:
-    print(f"Inputs in normal file but not in opt file: {missing_in_opt}")
+    if missing_in_normal:
+        eprint(f"Inputs in opt file but not in normal file: {missing_in_normal}")
+    if missing_in_opt:
+        eprint(f"Inputs in normal file but not in opt file: {missing_in_opt}")
 
-manager = BDDManager(1_000_000, 1_000_000, 1)
-names = []
+    manager = BDDManager(100_000_000, 100_000_000, 1)
+    names = []
+
+    eprint("adding propositions")
 
 # Assign new_var() to merged propositions
-for name, prop in propositions.items():
-    var = manager.new_var()
-    prop.oxiddvariable = var
-    names.append((var, name))
+    for name, prop in propositions.items():
+        var = manager.new_var()
+        prop.oxiddvariable = var
+        names.append((var, name))
 
 # Resolve output_atoms using merged propositions
-for atom in output_atoms:
-    atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name)
-    # Update the names list with the new mapping
-    for i, (var, n) in enumerate(names):
-        if n == atom.name:
-            names[i] = (atom.oxiddvariable, atom.name)
-            break
-    else:
-        names.append((atom.oxiddvariable, atom.name))
+
+    eprint("resolving normal output atoms")
+    for atom in output_atoms:
+        atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name)
+        # Update the names list with the new mapping
+        for i, (var, n) in enumerate(names):
+            if n == atom.name:
+                names[i] = (atom.oxiddvariable, atom.name)
+                break
+        else:
+            names.append((atom.oxiddvariable, atom.name))
 
 # Resolve opt_output_atoms using merged propositions
-for atom in opt_output_atoms:
-    atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name)
-    # Update the names list with the new mapping
-    for i, (var, n) in enumerate(names):
-        if n == atom.name:
-            names[i] = (atom.oxiddvariable, atom.name)
-            break
-    else:
-        names.append((atom.oxiddvariable, atom.name))
+    eprint("resolving opt output atoms")
+    for atom in opt_output_atoms:
+        atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name)
+        # Update the names list with the new mapping
+        for i, (var, n) in enumerate(names):
+            if n == atom.name:
+                names[i] = (atom.oxiddvariable, atom.name)
+                break
+        else:
+            names.append((atom.oxiddvariable, atom.name))
 
-manager.dump_all_dot_file(normal_circuit_dotfile_dest_path, functions=names, variables=names)
-write_output_atoms_to_file(output_atoms, output_list_path)
-print_propositions(propositions)
+    eprint("checking if outputs are equal in bdd")
+    result = True
+    for atom in output_atoms:
+        id = atom.index
+        for opt_atom in opt_output_atoms:
+            if opt_atom.index == id:
+                if not atom.oxiddvariable == opt_atom.oxiddvariable:
+                    result = False
+                    print(f'{atom.name} == {opt_atom.name} <==> {atom.oxiddvariable == opt_atom.oxiddvariable}')
+
+can_check = [1,2,3,4,5,6,7,8,9,10,11,13,19]
+for i in can_check:
+    print(f"Checking circuit {i}")
+    check_circuit(i)
