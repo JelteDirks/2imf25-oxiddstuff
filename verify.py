@@ -1,5 +1,21 @@
 import re
 from oxidd.bdd import BDDManager
+from enum import Enum
+
+class Operand(Enum):
+    OR = 1
+    AND = 2
+    NOT = 3
+    NAND = 4
+    NOR = 5
+    XOR = 6
+
+    @classmethod
+    def from_string(cls, string_value):
+        try:
+            return cls[string_value.upper()]
+        except KeyError:
+            raise ValueError(f"'{string_value}' is not a valid Operand")
 
 class OutputAtom:
     def __init__(self, name, index):
@@ -19,7 +35,7 @@ class Proposition:
     def __init__(self, name, raw_string, op=None, inputs=None):
         self.name = name
         self.raw_string = raw_string
-        self.op = op
+        self.op = Operand.from_string(op) if op else None
         self.inputs = inputs if inputs is not None else []
         self._oxiddvariable = None  # Initialize the property with a default value
         self._resolved = False  # Initialize the resolved property
