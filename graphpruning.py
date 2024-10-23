@@ -13,17 +13,24 @@ reachablepngfilename = f"{filename}_reachable.png"
 manager = BDDManager(100_000_000, 1_000_000, 1)
 
 
-u33 = manager.new_var()
-u34 = manager.new_var()
-u35 = (u33 & ~u34) | (~u33 & u34)
+a = manager.new_var()
+b = manager.new_var()
+e = manager.new_var()
+f = manager.new_var()
+g = manager.new_var()
+h = manager.new_var()
+
+c = ((~a & b) | (~b & a)) | (e & f)
+d = (a ^ b) | (g & h) 
 
 names = [
-    (u33, "u33"),
-    (u34, "u34"),
-    (u35, "u35"),
+    (c, "c"),
+    (d, "d"),
 ]
 
 manager.dump_all_dot_file(dotfilename, functions=names, variables=names)
+
+print(c == d)
 
 def get_reachable_subgraph(dot_file, start_label, output_file):
     # Load the graph from the .dot file
@@ -65,11 +72,14 @@ def get_reachable_subgraph(dot_file, start_label, output_file):
     # Write the subgraph to a new .dot file
     subgraph.write(output_file)
 
-get_reachable_subgraph(dotfilename, 'u35', reachabledotfilename)
 
 original_graph = pgv.AGraph(dotfilename)
 original_graph.draw(pngfilename, prog="dot")
 
-reachable_graph = pgv.AGraph(reachabledotfilename)
-reachable_graph.draw(reachablepngfilename, prog="dot")
+
+for var, name in names:
+    uniquename = f"{name}_{filename}"
+    get_reachable_subgraph(dotfilename, name, f"{uniquename}.dot")
+    reachable_graph = pgv.AGraph(f"{uniquename}.dot")
+    reachable_graph.draw(f"{uniquename}.png", prog="dot")
 
