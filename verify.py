@@ -1,16 +1,10 @@
 import re
+from oxidd.bdd import BDDManager
 
 class OutputAtom:
     def __init__(self, name, index):
         self.name = name
         self.index = index
-
-class Proposition:
-    def __init__(self, name, raw_string, op=None, inputs=None):
-        self.name = name
-        self.raw_string = raw_string
-        self.op = op
-        self.inputs = inputs if inputs is not None else []
         self._oxiddvariable = None  # Initialize the property with a default value
 
     @property
@@ -21,6 +15,34 @@ class Proposition:
     def oxiddvariable(self, value):
         self._oxiddvariable = value
 
+class Proposition:
+    def __init__(self, name, raw_string, op=None, inputs=None):
+        self.name = name
+        self.raw_string = raw_string
+        self.op = op
+        self.inputs = inputs if inputs is not None else []
+        self._oxiddvariable = None  # Initialize the property with a default value
+        self._resolved = False  # Initialize the resolved property
+
+    @property
+    def oxiddvariable(self):
+        return self._oxiddvariable
+
+    @oxiddvariable.setter
+    def oxiddvariable(self, value):
+        self._oxiddvariable = value
+
+    @property
+    def resolved(self):
+        return self._resolved
+
+    @resolved.setter
+    def resolved(self, value):
+        self._resolved = value
+
+    def resolve(self, propositions):
+        assert(propositions[self.name].oxiddvariable == self._oxiddvariable)
+        return propositions[self.name].oxiddvariable
 
 def parse_bench_file(file_path):
     input_names = []
@@ -66,12 +88,27 @@ def parse_bench_file(file_path):
 file_path = 'circuit-bench/circuit02.bench'
 input_names, output_atoms, propositions = parse_bench_file(file_path)
 
+manager = BDDManager(1_000_000, 1_000_000, 1)
+names = []
+
+for name, prop in propositions.items():
+    var = manager.new_var()
+    prop.oxiddvariable = var
+    names.append((var, name))
+
+for atom in output_atoms:
+    prop = propositions[atom.name]
+    atom.oxiddvariable = prop.resolve(propositions)
+
 print("Input Names:", input_names)
 print("Output Atoms:")
 for atom in output_atoms:
-    print(f"Name: {atom.name}, Index: {atom.index}")
+    print(f"Name: {atom.name}, Index: {atom.index}, Oxiddvariable: {atom.oxiddvariable}")
 
 print("Propositions:")
 for name, prop in propositions.items():
-    print(f"Name: {name}, Raw String: {prop.raw_string}, Operator: {prop.op}, Inputs: {prop.inputs}")
+    print(f"Name: {name}, Raw String: {prop.raw_string}, Operator: {prop.op}, Inputs: {prop.inputs}, Oxiddvariable: {prop.oxiddvariable}, Resolved: {prop.resolved}")
 
+print("Variable Mapping:")
+for var, name in names:
+    print(f"Variable: {var}, Name: {name}")
