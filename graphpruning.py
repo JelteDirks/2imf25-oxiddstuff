@@ -20,15 +20,20 @@ f = manager.new_var()
 g = manager.new_var()
 h = manager.new_var()
 
-c = ((~a & b) | (~b & a)) | (e & f)
-d = (a ^ b) | (g & h) 
+c = ((~a & b) | (~b & a)) & (g & h)
+d = (a ^ b) & (h & g)
+
+z = c.equiv(d)
+
+print(z.valid())
+
 
 names = [
     (c, "c"),
     (d, "d"),
 ]
 
-manager.dump_all_dot_file(dotfilename, functions=names, variables=names)
+manager.dump_all_dot_file(dotfilename, functions=names)
 
 print(c == d)
 
