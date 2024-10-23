@@ -1,6 +1,22 @@
+import os
 import re
 from oxidd.bdd import BDDManager
 from enum import Enum
+
+def debug_print():
+    print("Input Names:", input_atoms)
+    print("Output Atoms:")
+    for atom in output_atoms:
+        print(f"Name: {atom.name}, Index: {atom.index}, Oxiddvariable: {atom.oxiddvariable}")
+
+    print("Propositions:")
+    for name, prop in propositions.items():
+        print(f"Name: {name}, Raw String: {prop.raw_string}, Operator: {prop.op}, Inputs: {prop.inputs}, Oxiddvariable: {prop.oxiddvariable}, Resolved: {prop.resolved}")
+
+    print("Variable Mapping:")
+    for var, name in names:
+        print(f"Variable: {var}, Name: {name}")
+
 
 class Operand(Enum):
     OR = 1
@@ -101,7 +117,7 @@ def resolve_to_oxidd(propositions, name):
     return prop.cached
 
 def parse_bench_file(file_path):
-    input_names = []
+    input_atoms = []
     output_atoms = []
     propositions = {}
     output_counter = 1
@@ -112,7 +128,7 @@ def parse_bench_file(file_path):
             if line.startswith("INPUT"):
                 # Extract the name between the brackets
                 name = re.search(r'\((.*?)\)', line).group(1)
-                input_names.append(name)
+                input_atoms.append(name)
                 # Add to propositions with no operation and empty inputs
                 propositions[name] = Proposition(name, line.strip())
             # Check if the line is an output line
@@ -138,11 +154,28 @@ def parse_bench_file(file_path):
                     # Create a Proposition instance and add it to the dictionary
                     propositions[name] = Proposition(name, raw_string, op, inputs)
 
-    return input_names, output_atoms, propositions
+    return input_atoms, output_atoms, propositions
+
+def write_output_atoms_to_file(output_atoms, file_path):
+    with open(file_path, 'w') as file:
+        for atom in output_atoms:
+            file.write(f"{atom.name}\n")
 
 # Example usage
-file_path = 'circuit-bench/circuit02.bench'
-input_names, output_atoms, propositions = parse_bench_file(file_path)
+bench_dir = 'circuit-bench'
+circuit_number = 2
+circuit_name = f'circuit{circuit_number:02}'
+normal_circuit_source_path = f'{bench_dir}/{circuit_name}.bench'
+opt_circuit_source_path = f'{bench_dir}/{circuit_name}_opt.bench'
+
+dest_dir = f'{circuit_name}_out'
+os.makedirs(dest_dir, exist_ok=True)
+
+normal_circuit_dotfile_dest_path = f'{dest_dir}/{circuit_name}.dot'
+opt_circuit_dotfile_dest_path = f'{dest_dir}/{circuit_name}_opt.dot'
+output_list_path = f'{dest_dir}/{circuit_name}_outputs.txt'
+
+input_atoms, output_atoms, propositions = parse_bench_file(normal_circuit_source_path)
 
 manager = BDDManager(1_000_000, 1_000_000, 1)
 names = []
@@ -154,17 +187,15 @@ for name, prop in propositions.items():
 
 for atom in output_atoms:
     atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name)
+    # Update the names list with the new mapping
+    for i, (var, n) in enumerate(names):
+        if n == atom.name:
+            names[i] = (atom.oxiddvariable, atom.name)
+            break
+    else:
+        names.append((atom.oxiddvariable, atom.name))
 
-print("Input Names:", input_names)
-print("Output Atoms:")
-for atom in output_atoms:
-    print(f"Name: {atom.name}, Index: {atom.index}, Oxiddvariable: {atom.oxiddvariable}")
+manager.dump_all_dot_file(normal_circuit_dotfile_dest_path, functions=names, variables=names)
+write_output_atoms_to_file(output_atoms, output_list_path)
 
-print("Propositions:")
-for name, prop in propositions.items():
-    print(f"Name: {name}, Raw String: {prop.raw_string}, Operator: {prop.op}, Inputs: {prop.inputs}, Oxiddvariable: {prop.oxiddvariable}, Resolved: {prop.resolved}")
-
-print("Variable Mapping:")
-for var, name in names:
-    print(f"Variable: {var}, Name: {name}")
-
+#debug_print() # Used for debugging only
