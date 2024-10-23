@@ -168,8 +168,10 @@ def check_circuit(circuit_number):
                 if not atom.oxiddvariable == opt_atom.oxiddvariable:
                     result = False
                     print(f'{atom.name} == {opt_atom.name} <==> {atom.oxiddvariable == opt_atom.oxiddvariable}')
+    print(f"RESULT={result}")
 
-can_check = [1,2,3,4,5,6,7,8,9,10,11,13,19]
-for i in can_check:
+can_not_check = [12,14,15,16,17,18,19,20]
+can_check = [1,2,3,4,5,6,7,8,9,10,11,13]
+for i in can_not_check:
     print(f"Checking circuit {i}")
     check_circuit(i)
