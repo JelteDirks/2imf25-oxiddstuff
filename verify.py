@@ -17,6 +17,46 @@ class Operand(Enum):
         except KeyError:
             raise ValueError(f"'{string_value}' is not a valid Operand")
 
+    def apply(self, *args):
+        # If a single list is passed as the first argument, unpack it
+        if len(args) == 1 and isinstance(args[0], list):
+            args = args[0]
+
+        if not args:
+            raise ValueError("At least one argument is required")
+
+        if self == Operand.AND:
+            result = args[0]
+            for arg in args[1:]:
+                result &= arg
+            return result
+        elif self == Operand.OR:
+            result = args[0]
+            for arg in args[1:]:
+                result |= arg
+            return result
+        elif self == Operand.NOT:
+            if len(args) != 1:
+                raise ValueError("NOT operation requires exactly one argument")
+            return ~args[0]
+        elif self == Operand.NAND:
+            result = args[0]
+            for arg in args[1:]:
+                result &= arg
+            return ~result
+        elif self == Operand.NOR:
+            result = args[0]
+            for arg in args[1:]:
+                result |= arg
+            return ~result
+        elif self == Operand.XOR:
+            result = args[0]
+            for arg in args[1:]:
+                result ^= arg
+            return result
+        else:
+            raise ValueError(f"Operation not supported for {self.name}")
+
 class OutputAtom:
     def __init__(self, name, index):
         self.name = name
@@ -39,6 +79,7 @@ class Proposition:
         self.inputs = inputs if inputs is not None else []
         self._oxiddvariable = None  # Initialize the property with a default value
         self._resolved = False  # Initialize the resolved property
+        self._cached = None  # Initialize the cached property
 
     @property
     def oxiddvariable(self):
@@ -56,9 +97,25 @@ class Proposition:
     def resolved(self, value):
         self._resolved = value
 
-    def resolve(self, propositions):
-        assert(propositions[self.name].oxiddvariable == self._oxiddvariable)
-        return propositions[self.name].oxiddvariable
+    def resolve_to_oxidd(self, propositions, name):
+        assert propositions[name].oxiddvariable == self._oxiddvariable
+        prop = propositions[name]
+
+        if self.resolved:
+            return self._cached
+
+        if not prop.inputs and prop.op:
+            raise Exception(f"inputs is none but operand is: {prop.op}")
+        if prop.inputs and not prop.op:
+            raise Exception(f"prop has no operand but inputs are: {prop.inputs}")
+        if not prop.inputs and not prop.op:
+            return prop._oxiddvariable
+
+        resolved_input_variables = [propositions[i].resolve_to_oxidd(propositions, i) for i in prop.inputs]
+
+        self._cached = prop.op.apply(resolved_input_variables)
+        self.resolved = True
+        return self._cached
 
 def parse_bench_file(file_path):
     input_names = []
@@ -114,7 +171,7 @@ for name, prop in propositions.items():
 
 for atom in output_atoms:
     prop = propositions[atom.name]
-    atom.oxiddvariable = prop.resolve(propositions)
+    atom.oxiddvariable = prop.resolve_to_oxidd(propositions, atom.name)
 
 print("Input Names:", input_names)
 print("Output Atoms:")
@@ -128,3 +185,4 @@ for name, prop in propositions.items():
 print("Variable Mapping:")
 for var, name in names:
     print(f"Variable: {var}, Name: {name}")
+
