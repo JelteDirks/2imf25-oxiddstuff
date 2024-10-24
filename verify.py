@@ -1,3 +1,4 @@
+import gc
 import time
 import os
 import re
@@ -10,14 +11,14 @@ def eprint(msg):
     print(msg, file=sys.stderr)
 
 def print_propositions(props):
-    print("Merged Propositions:")
+    eprint("Merged Propositions:")
     for name, prop in props.items():
-        print(f"Name: {name}, Raw String: {prop.raw_string}, Operator: {prop.op}, Inputs: {prop.inputs}")
+        eprint(f"Name: {name}, Raw String: {prop.raw_string}, Operator: {prop.op}, Inputs: {prop.inputs}")
 
 def resolve_to_oxidd(propositions, name, manager):
     prop = propositions[name]
 
-    if prop.oxiddvariable:
+    if prop.oxiddvariable and prop.oxiddvariable.manager == manager:
         return prop.oxiddvariable
 
     if not prop.inputs and prop.op:
@@ -116,38 +117,47 @@ def check_circuit(circuit_number):
         raise ValueError(error_message)
 
 
-    manager = BDDManager(100_000_000, 100_000_000, 1)
-
     start_time = time.time()
+    result = True
 
-    eprint("=== ORIGINAL ===")
-    for atom in output_atoms:
+    testloop = False
+
+    for i, atom in enumerate(output_atoms):
+        opt_atom = opt_output_atoms[i]
+
+        if atom.name.strip() == "P2_U3490" or opt_atom.name == "P2_U3490":
+            testloop = True
+
+        if not testloop:
+            eprint(f"Skipping {atom.name} == {opt_atom.name}")
+            continue
+
+        manager = BDDManager(100_000_000, 100_000_000, 1)
+
         current_time = time.time()
         eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[atom.name].raw_string))
         atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name, manager)
-        # Update the start time for the next iteration
         start_time = current_time
 
-    eprint("=== OPT ===")
-    for opt_atom in opt_output_atoms:
         current_time = time.time()
         eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[opt_atom.name].raw_string))
         opt_atom.oxiddvariable = resolve_to_oxidd(propositions, opt_atom.name, manager)
-        # Update the start time for the next iteration
         start_time = current_time
 
-    result = True
-    for i,atom in enumerate(output_atoms):
-        opt_atom = opt_output_atoms[i]
-        if opt_atom.index == atom.index:
-            if not atom.oxiddvariable == opt_atom.oxiddvariable:
-                result = False
-            print(f'{atom.name} == {opt_atom.name} <==> {atom.oxiddvariable == opt_atom.oxiddvariable}')
+        num_nodes = manager.num_inner_nodes()
+
+        eprint(f"Number of inner nodes: {num_nodes}")
+
+        if not atom.oxiddvariable == opt_atom.oxiddvariable:
+            result = False
+        eprint(f'{atom.name} == {opt_atom.name} <==> {atom.oxiddvariable == opt_atom.oxiddvariable}')
+
     print(result)
+
 
 can_check = [1,2,3,4,5,6,7,8,9,10,11,12,13]
 can_not_check = [14,15,16,17,18,19,20]
-test = [1]
+test = [14]
 for circuit_id in test:
     print(f"Checking circuit {circuit_id}")
     check_circuit(circuit_id)
