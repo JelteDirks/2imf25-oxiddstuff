@@ -1,4 +1,4 @@
-import sys
+import time
 import os
 import re
 import sys
@@ -104,13 +104,22 @@ def check_circuit(circuit_number):
 
     manager = BDDManager(100_000_000, 100_000_000, 1)
 
-    for atom in output_atoms:
-        eprint(propositions[atom.name].raw_string)
-        atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name, manager)
+    start_time = time.time()
 
+    for atom in output_atoms:
+        current_time = time.time()
+        eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[atom.name].raw_string))
+        atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name, manager)
+        # Update the start time for the next iteration
+        start_time = current_time
+
+    eprint("=== OPT ===")
     for opt_atom in opt_output_atoms:
-        eprint(propositions[atom.name].raw_string)
+        current_time = time.time()
+        eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[opt_atom.name].raw_string))
         opt_atom.oxiddvariable = resolve_to_oxidd(propositions, opt_atom.name, manager)
+        # Update the start time for the next iteration
+        start_time = current_time
 
     result = True
     for i,atom in enumerate(output_atoms):
