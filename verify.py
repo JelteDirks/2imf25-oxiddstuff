@@ -17,23 +17,21 @@ def print_propositions(props):
 def resolve_to_oxidd(propositions, name, manager):
     prop = propositions[name]
 
-    if prop.resolved:
-        return prop.cached
+    if prop.oxiddvariable:
+        return prop.oxiddvariable
 
     if not prop.inputs and prop.op:
         raise Exception(f"inputs is none but operand is: {prop.op}")
     if prop.inputs and not prop.op:
         raise Exception(f"prop has no operand but inputs are: {prop.inputs}")
     if not prop.inputs and not prop.op:
-        prop.cached = manager.new_var()
-        prop.resolved = True
-        return prop.cached
+        prop.oxiddvariable = manager.new_var()
+        return prop.oxiddvariable
 
     resolved_input_variables = [resolve_to_oxidd(propositions, i, manager) for i in prop.inputs]
 
-    prop.cached = prop.op.apply(resolved_input_variables)
-    prop.resolved = True
-    return prop.cached
+    prop.oxiddvariable = prop.op.apply(resolved_input_variables)
+    return prop.oxiddvariable
 
 def parse_bench_file(file_path, propositions):
     input_atoms = []
@@ -80,7 +78,6 @@ def write_output_atoms_to_file(output_atoms, file_path):
             file.write(f"{atom.name}\n")
 
 
-
 def check_circuit(circuit_number):
     bench_dir = 'circuit-bench'
     circuit_name = f'circuit{circuit_number:02}'
@@ -93,9 +90,6 @@ def check_circuit(circuit_number):
         print(f"Error: {opt_circuit_source_path} does not exist.")
 
     propositions = {}
-
-    eprint("parsing bench files")
-
     input_atoms, output_atoms = parse_bench_file(normal_circuit_source_path, propositions)
     opt_input_atoms, opt_output_atoms = parse_bench_file(opt_circuit_source_path, propositions)
 
@@ -108,29 +102,28 @@ def check_circuit(circuit_number):
     if missing_in_opt:
         eprint(f"Inputs in normal file but not in opt file: {missing_in_opt}")
 
-    manager = BDDManager(1_000_000_000, 1_000_000_000, 1)
+    manager = BDDManager(100_000_000, 100_000_000, 1)
 
-    eprint("resolving normal output atoms")
     for atom in output_atoms:
+        eprint(propositions[atom.name].raw_string)
         atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name, manager)
 
-    eprint("resolving opt output atoms")
-    for atom in opt_output_atoms:
-        atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name, manager)
+    for opt_atom in opt_output_atoms:
+        eprint(propositions[atom.name].raw_string)
+        opt_atom.oxiddvariable = resolve_to_oxidd(propositions, opt_atom.name, manager)
 
-    eprint("checking if outputs are equal in bdd")
     result = True
     for i,atom in enumerate(output_atoms):
         opt_atom = opt_output_atoms[i]
         if opt_atom.index == atom.index:
             if not atom.oxiddvariable == opt_atom.oxiddvariable:
                 result = False
-                print(f'{atom.name} == {opt_atom.name} <==> {atom.oxiddvariable == opt_atom.oxiddvariable}')
+            print(f'{atom.name} == {opt_atom.name} <==> {atom.oxiddvariable == opt_atom.oxiddvariable}')
     print(result)
 
 can_check = [1,2,3,4,5,6,7,8,9,10,11,12,13]
 can_not_check = [14,15,16,17,18,19,20]
-test = [15, 19, 20]
+test = [14]
 for circuit_id in test:
     print(f"Checking circuit {circuit_id}")
     check_circuit(circuit_id)

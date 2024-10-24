@@ -4,15 +4,8 @@ class OutputAtom:
     def __init__(self, name, index):
         self.name = name
         self.index = index
-        self._oxiddvariable = None  # Initialize the property with a default value
+        self.oxiddvariable = None  # Initialize the property with a default value
 
-    @property
-    def oxiddvariable(self):
-        return self._oxiddvariable
-
-    @oxiddvariable.setter
-    def oxiddvariable(self, value):
-        self._oxiddvariable = value
 
 class Proposition:
     def __init__(self, name, raw_string, op=None, inputs=None):
@@ -21,8 +14,6 @@ class Proposition:
         self.op = Operand.from_string(op) if op else None
         self.inputs = inputs if inputs is not None else []
         self.oxiddvariable = None  # Initialize the property with a default value
-        self.resolved = False  # Initialize the resolved property
-        self.cached = None  # Initialize the cached property
 
 class Operand(Enum):
     OR = 1
