@@ -85,27 +85,42 @@ def check_circuit(circuit_number):
     opt_circuit_source_path = f'{bench_dir}/{circuit_name}_opt.bench'
 
     if not os.path.exists(normal_circuit_source_path):
-        print(f"Error: {normal_circuit_source_path} does not exist.")
+        raise FileNotFoundError(f"Error: {normal_circuit_source_path} does not exist.")
     if not os.path.exists(opt_circuit_source_path):
-        print(f"Error: {opt_circuit_source_path} does not exist.")
+        raise FileNotFoundError(f"Error: {opt_circuit_source_path} does not exist.")
 
     propositions = {}
     input_atoms, output_atoms = parse_bench_file(normal_circuit_source_path, propositions)
     opt_input_atoms, opt_output_atoms = parse_bench_file(opt_circuit_source_path, propositions)
 
-# Sanity check for input atoms
     missing_in_normal = set(opt_input_atoms) - set(input_atoms)
     missing_in_opt = set(input_atoms) - set(opt_input_atoms)
 
     if missing_in_normal:
-        eprint(f"Inputs in opt file but not in normal file: {missing_in_normal}")
+        raise ValueError(f"Inputs in opt file but not in normal file: {missing_in_normal}")
     if missing_in_opt:
-        eprint(f"Inputs in normal file but not in opt file: {missing_in_opt}")
+        raise ValueError(f"Inputs in normal file but not in opt file: {missing_in_opt}")
+
+    if len(output_atoms) != len(opt_output_atoms):
+        output_atom_names = {atom.name for atom in output_atoms}
+        opt_output_atom_names = {atom.name for atom in opt_output_atoms}
+        missing_in_output = opt_output_atom_names - output_atom_names
+        missing_in_opt_output = output_atom_names - opt_output_atom_names
+        error_message = (
+            f"Mismatch in the number of output atoms:\n"
+            f"output_atoms: {len(output_atoms)}\n"
+            f"opt_output_atoms: {len(opt_output_atoms)}\n"
+            f"Missing in output_atoms: {missing_in_output}\n"
+            f"Missing in opt_output_atoms: {missing_in_opt_output}"
+        )
+        raise ValueError(error_message)
+
 
     manager = BDDManager(100_000_000, 100_000_000, 1)
 
     start_time = time.time()
 
+    eprint("=== ORIGINAL ===")
     for atom in output_atoms:
         current_time = time.time()
         eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[atom.name].raw_string))
@@ -132,7 +147,7 @@ def check_circuit(circuit_number):
 
 can_check = [1,2,3,4,5,6,7,8,9,10,11,12,13]
 can_not_check = [14,15,16,17,18,19,20]
-test = [14]
+test = [1]
 for circuit_id in test:
     print(f"Checking circuit {circuit_id}")
     check_circuit(circuit_id)
