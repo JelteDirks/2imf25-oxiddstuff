@@ -1,4 +1,3 @@
-import gc
 import time
 import os
 import re
@@ -8,10 +7,11 @@ from classes import OutputAtom, Proposition
 
 
 def eprint(msg):
+    print(msg)
+    return
     print(msg, file=sys.stderr)
 
 def print_propositions(props):
-    eprint("Merged Propositions:")
     for name, prop in props.items():
         eprint(f"Name: {name}, Raw String: {prop.raw_string}, Operator: {prop.op}, Inputs: {prop.inputs}")
 
@@ -120,44 +120,32 @@ def check_circuit(circuit_number):
     start_time = time.time()
     result = True
 
-    testloop = False
-
     for i, atom in enumerate(output_atoms):
         opt_atom = opt_output_atoms[i]
 
-        if atom.name.strip() == "P2_U3490" or opt_atom.name == "P2_U3490":
-            testloop = True
-
-        if not testloop:
-            eprint(f"Skipping {atom.name} == {opt_atom.name}")
-            continue
-
-        manager = BDDManager(100_000_000, 100_000_000, 1)
+        manager = BDDManager(10_000_000, 10_000_000, 1)
 
         current_time = time.time()
-        eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[atom.name].raw_string))
+        #eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[atom.name].raw_string))
         atom.oxiddvariable = resolve_to_oxidd(propositions, atom.name, manager)
         start_time = current_time
 
         current_time = time.time()
-        eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[opt_atom.name].raw_string))
+        #eprint("{:.6f} seconds - {}".format(current_time - start_time, propositions[opt_atom.name].raw_string))
         opt_atom.oxiddvariable = resolve_to_oxidd(propositions, opt_atom.name, manager)
         start_time = current_time
 
-        num_nodes = manager.num_inner_nodes()
-
-        eprint(f"Number of inner nodes: {num_nodes}")
-
         if not atom.oxiddvariable == opt_atom.oxiddvariable:
             result = False
-        eprint(f'{atom.name} == {opt_atom.name} <==> {atom.oxiddvariable == opt_atom.oxiddvariable}')
+            eprint(f'{atom.name} == {opt_atom.name} <==> {atom.oxiddvariable == opt_atom.oxiddvariable}')
+            break;
 
     print(result)
 
 
-can_check = [1,2,3,4,5,6,7,8,9,10,11,12,13]
-can_not_check = [14,15,16,17,18,19,20]
-test = [14]
+can_check = [1,2,3,4,5,6,7,8,9,10,11,12,13,14]
+can_not_check = [15,16,17,18,19,20]
+test = [15]
 for circuit_id in test:
     print(f"Checking circuit {circuit_id}")
     check_circuit(circuit_id)
